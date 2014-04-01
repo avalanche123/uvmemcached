@@ -58,3 +58,5 @@ Makefile.in
 *.exe
 *.out
 *.app
+
+libuvmemcached.xcodeproj
