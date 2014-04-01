@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=${prefix}/include
+
+Name: UVMEMCACHED
+Description: Memcached client for libuv
+Version: @VERSION@
+Libs: -L${libdir} -luvmemcached
+Cflags: -I${includedir}
