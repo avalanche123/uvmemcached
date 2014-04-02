@@ -7,7 +7,7 @@ static int uv_memcached_reserve_connection_callback_queue_push(uv_memcached_rese
 static uv_memcached_reserve_connection_callback_t* uv_memcached_reserve_connection_callback_queue_pop(uv_memcached_reserve_connection_callback_queue_t* self);
 
 static void uv_memcached_conn_pool_on_connect(uv_connect_t* req, int status);
-static void uv_memcached_conn_pool_on_disconnect(uv_memcached_conn_pool_t* pool, void* context);
+static void uv_memcached_conn_pool_free(uv_memcached_conn_pool_t* pool, void* context);
 static void uv_memcached_conn_pool_on_close(uv_handle_t* handle);
 static void uv_memcached_conn_pool_on_reserve_connection(uv_memcached_conn_t* connection, void* context);
 
@@ -32,6 +32,8 @@ uv_memcached_conn_pool_new(uv_loop_t* loop, unsigned int size)
     pool->tail        = 0;
     pool->available   = 0;
     pool->connected   = 0;
+    pool->connecting  = 0;
+    pool->closed      = 0;
     pool->connections = (uv_tcp_t**) calloc(size, sizeof(uv_tcp_t*));
 
     assert(pool->connections);
@@ -69,16 +71,14 @@ uv_memcached_conn_pool_destroy(uv_memcached_conn_pool_t** self_p)
         uv_memcached_conn_pool_t *self = *self_p;
 
         if (self->connected > 0) {
-            uv_memcached_conn_pool_disconnect(self, NULL, uv_memcached_conn_pool_on_disconnect);
+            uv_memcached_conn_pool_disconnect(self, NULL, uv_memcached_conn_pool_free);
         } else {
-            for (i = 0; i < self->size; i++) {
-                free(self->connections[i]->data);
-                free(self->connections[i]);
-            }
+            self->on_close_cb  = uv_memcached_conn_pool_free;
+            self->on_close_ctx = NULL;
 
-            free(self->connections);
-            uv_memcached_reserve_connection_callback_queue_destroy(&self->callback_queue);
-            free(self);
+            for (i = 0; i < self->size; i++) {
+                uv_close((uv_handle_t*) self->connections[i], uv_memcached_conn_pool_on_close);
+            }
         }
 
         *self_p = NULL;
@@ -114,6 +114,7 @@ uv_memcached_conn_pool_connect(uv_memcached_conn_pool_t* self, const char* conne
 
         self->on_connect_ctx = context;
         self->on_connect_cb  = callback;
+        self->connecting     = self->size;
 
         addr = uv_ip4_addr(ip, port);
 
@@ -140,8 +141,8 @@ uv_memcached_conn_pool_disconnect(uv_memcached_conn_pool_t* self, void* context,
 {
     int i;
 
-    self->on_disconnect_ctx = context;
-    self->on_disconnect_cb  = callback;
+    self->on_close_cb  = callback;
+    self->on_close_ctx = context;
 
     for (i = 0; i < self->connected; i++) {
         uv_memcached_conn_pool_reserve_connection(self, context, uv_memcached_conn_pool_on_reserve_connection);
@@ -323,25 +324,39 @@ uv_memcached_reserve_connection_callback_queue_pop(uv_memcached_reserve_connecti
 static void
 uv_memcached_conn_pool_on_connect(uv_connect_t* req, int status)
 {
-    uv_memcached_conn_pool_t* pool = (uv_memcached_conn_pool_t*) req->data;
+    uv_memcached_conn_pool_t* pool;
+    uv_memcached_conn_pool_connect_cb on_connect_cb;
+    void* on_connect_ctx;
+
+    pool = (uv_memcached_conn_pool_t*) req->data;
 
     free(req);
+
+    pool->connecting--;
 
     if (status == 0) {
         pool->available++;
         pool->tail++;
         pool->connected++;
+    }
+
+    if (pool->connecting == 0) {
+        on_connect_cb  = pool->on_connect_cb;
+        on_connect_ctx = pool->on_connect_ctx;
+
+        pool->on_connect_cb  = NULL;
+        pool->on_connect_ctx = NULL;
 
         if (pool->connected == pool->size) {
-            pool->on_connect_cb(pool, 0, pool->on_connect_ctx);
+            on_connect_cb(pool, 0, on_connect_ctx);
+        } else {
+            on_connect_cb(pool, -1, on_connect_ctx);
         }
-    } else {
-        pool->on_connect_cb(pool, -1, pool->on_connect_ctx);
     }
 }
 
 static void
-uv_memcached_conn_pool_on_disconnect(uv_memcached_conn_pool_t* pool, void* context)
+uv_memcached_conn_pool_free(uv_memcached_conn_pool_t* pool, void* context)
 {
     unsigned int i;
 
@@ -367,15 +382,23 @@ uv_memcached_conn_pool_on_close(uv_handle_t* handle)
     uv_tcp_t* tcp;
     uv_memcached_conn_t* connection;
     uv_memcached_conn_pool_t* pool;
+    uv_memcached_conn_pool_disconnect_cb on_close_cb;
+    void* on_close_ctx;
 
-    tcp        = (uv_tcp_t*) handle;
-    connection = (uv_memcached_conn_t*) tcp->data;
-    pool       = connection->pool;
+    tcp               = (uv_tcp_t*) handle;
+    connection        = (uv_memcached_conn_t*) tcp->data;
+    pool              = connection->pool;
 
-    pool->connected--;
+    pool->closed++;
 
-    if (pool->connected == 0) {
-        pool->on_disconnect_cb(pool, pool->on_disconnect_ctx);
+    if (pool->closed == pool->size) {
+        on_close_cb  = pool->on_close_cb;
+        on_close_ctx = pool->on_close_ctx;
+
+        pool->on_close_cb  = NULL;
+        pool->on_close_ctx = NULL;
+
+        on_close_cb(pool, on_close_ctx);
     }
 }
 

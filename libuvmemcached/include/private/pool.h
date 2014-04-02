@@ -26,7 +26,9 @@ typedef struct {
 } uv_memcached_reserve_connection_callback_queue_t;
 
 struct uv_memcached_conn_pool_s {
+    unsigned int                                      connecting;
     unsigned int                                      connected;
+    unsigned int                                      closed;
     unsigned int                                      size;
     unsigned int                                      head;
     unsigned int                                      tail;
@@ -34,8 +36,8 @@ struct uv_memcached_conn_pool_s {
     uv_tcp_t**                                        connections;
     uv_memcached_conn_pool_connect_cb                 on_connect_cb;
     void*                                             on_connect_ctx;
-    uv_memcached_conn_pool_disconnect_cb              on_disconnect_cb;
-    void*                                             on_disconnect_ctx;
+    uv_memcached_conn_pool_disconnect_cb              on_close_cb;
+    void*                                             on_close_ctx;
     uv_memcached_reserve_connection_callback_queue_t* callback_queue;
 };
 

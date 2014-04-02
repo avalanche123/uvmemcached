@@ -397,6 +397,7 @@ on_connect(uv_memcached_t* memcached, int status, void* context)
     if (status == 0) {
         assert(uv_memcached_set(memcached, "somekey", data, (void*) data, on_set) == 0);
     } else {
+        free(data);
         uv_memcached_destroy(&memcached);
     }
 }

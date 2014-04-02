@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     loop = uv_default_loop();
 
     uv_memcached_conn_pool_test(loop, verbose);
-    // uv_memcached_test(loop, verbose);
+    uv_memcached_test(loop, verbose);
 
     uv_run(loop, UV_RUN_DEFAULT);
 
