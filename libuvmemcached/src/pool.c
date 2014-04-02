@@ -7,6 +7,7 @@ static int uv_memcached_reserve_connection_callback_queue_push(uv_memcached_rese
 static uv_memcached_reserve_connection_callback_t* uv_memcached_reserve_connection_callback_queue_pop(uv_memcached_reserve_connection_callback_queue_t* self);
 
 static void uv_memcached_conn_pool_on_connect(uv_connect_t* req, int status);
+static void uv_memcached_conn_pool_on_disconnect(uv_memcached_conn_pool_t* pool, void* context);
 static void uv_memcached_conn_pool_on_close(uv_handle_t* handle);
 static void uv_memcached_conn_pool_on_reserve_connection(uv_memcached_conn_t* connection, void* context);
 
@@ -67,14 +68,18 @@ uv_memcached_conn_pool_destroy(uv_memcached_conn_pool_t** self_p)
     if (*self_p) {
         uv_memcached_conn_pool_t *self = *self_p;
 
-        for (i = 0; i < self->size; i++) {
-            free(self->connections[i]->data);
-            free(self->connections[i]);
-        }
+        if (self->connected > 0) {
+            uv_memcached_conn_pool_disconnect(self, NULL, uv_memcached_conn_pool_on_disconnect);
+        } else {
+            for (i = 0; i < self->size; i++) {
+                free(self->connections[i]->data);
+                free(self->connections[i]);
+            }
 
-        free(self->connections);
-        uv_memcached_reserve_connection_callback_queue_destroy(&self->callback_queue);
-        free(self);
+            free(self->connections);
+            uv_memcached_reserve_connection_callback_queue_destroy(&self->callback_queue);
+            free(self);
+        }
 
         *self_p = NULL;
     }
@@ -138,7 +143,7 @@ uv_memcached_conn_pool_disconnect(uv_memcached_conn_pool_t* self, void* context,
     self->on_disconnect_ctx = context;
     self->on_disconnect_cb  = callback;
 
-    for (i = 0; i < self->size; i++) {
+    for (i = 0; i < self->connected; i++) {
         uv_memcached_conn_pool_reserve_connection(self, context, uv_memcached_conn_pool_on_reserve_connection);
     }
 
@@ -336,6 +341,21 @@ uv_memcached_conn_pool_on_connect(uv_connect_t* req, int status)
 }
 
 static void
+uv_memcached_conn_pool_on_disconnect(uv_memcached_conn_pool_t* pool, void* context)
+{
+    unsigned int i;
+
+    for (i = 0; i < pool->size; i++) {
+        free(pool->connections[i]->data);
+        free(pool->connections[i]);
+    }
+
+    free(pool->connections);
+    uv_memcached_reserve_connection_callback_queue_destroy(&pool->callback_queue);
+    free(pool);
+}
+
+static void
 uv_memcached_conn_pool_on_reserve_connection(uv_memcached_conn_t* connection, void* context)
 {
     uv_close((uv_handle_t*) connection->tcp, uv_memcached_conn_pool_on_close);
@@ -385,13 +405,12 @@ static void
 on_connect(uv_memcached_conn_pool_t* pool, int status, void* context)
 {
     assert(strcmp((char *) context, ctx) == 0);
-
-    if (status != 0) {
-        assert(0);
+    if (status == 0) {
+        assert(pool->available == pool->size);
+        assert(uv_memcached_conn_pool_reserve_connection(pool, NULL, on_reserve_connection) == 0);
+    } else {
+        uv_memcached_conn_pool_destroy(&pool);
     }
-
-    assert(pool->available == pool->size);
-    assert(uv_memcached_conn_pool_reserve_connection(pool, NULL, on_reserve_connection) == 0);
 }
 
 static void

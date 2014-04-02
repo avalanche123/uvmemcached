@@ -394,7 +394,11 @@ on_connect(uv_memcached_t* memcached, int status, void* context)
     assert(memcached);
     assert(context == NULL);
 
-    assert(uv_memcached_set(memcached, "somekey", data, (void*) data, on_set) == 0);
+    if (status == 0) {
+        assert(uv_memcached_set(memcached, "somekey", data, (void*) data, on_set) == 0);
+    } else {
+        uv_memcached_destroy(&memcached);
+    }
 }
 
 static void
