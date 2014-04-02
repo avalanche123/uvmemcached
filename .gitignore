@@ -60,3 +60,4 @@ Makefile.in
 *.app
 
 .vagrant
+Gemfile.lock
