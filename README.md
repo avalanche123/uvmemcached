@@ -28,3 +28,14 @@ make
 make check
 sudo make install
 ```
+
+## Installing uvmemcachedrb
+
+After you've executed commands in Installing libuvmemcached section:
+
+```shell
+sudo gem install bundler
+cd /usr/local/src/uvmemcachedrb
+bundle
+rake test
+```
