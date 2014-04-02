@@ -59,4 +59,4 @@ Makefile.in
 *.out
 *.app
 
-libuvmemcached.xcodeproj
+.vagrant
