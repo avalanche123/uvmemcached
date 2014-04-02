@@ -56,18 +56,22 @@ module UV
 
         @get_callback = block
 
-        check_rc(Memcached.fn_get(@memcached, key, nil, callback(:on_get)), "unable to get #{key.inspect}")
+        check_rc(Memcached.fn_get(@memcached_t, key, nil, callback(:on_get)), "unable to get #{key.inspect}")
       end
 
       def set(key, value, &block)
         assert_string(key, "key must be a string")
         assert_string(value, "value must be a string")
         assert_not_null(block, "callback block is required")
-        assert_artity(1, block, "callback must accept one arguments")
+        assert_artity(1, block, "callback must accept one argument")
 
         @set_callback = block
 
-        check_rc(Memcached.fn_get(@memcached, key, value, nil, callback(:on_set)), "unable to set #{key.inspect}")
+        check_rc(Memcached.fn_set(@memcached_t, key, value, nil, callback(:on_set)), "unable to set #{key.inspect}")
+      end
+
+      def callback(method_name)
+        self.class.define_callback(object_id, method_name, method(method_name))
       end
 
       private
@@ -88,24 +92,20 @@ module UV
         @set_callback.call(status != 0)
       end
 
-      def callback(method_name)
-        self.class.define_callback(object_id, method_name, method(method_name))
-      end
-
       def assert_string(string, message)
-        raise message unless string.is_a?(String)
+        raise ::ArgumentError, message unless string.is_a?(String)
       end
 
       def assert_format(regexp, string, message)
-        raise message if regexp.match(string).nil?
+        raise ::ArgumentError, message if regexp.match(string).nil?
       end
 
       def assert_not_null(object, message)
-        raise message if object.nil?
+        raise ::ArgumentError, message if object.nil?
       end
 
       def assert_artity(arity, callable, message)
-        raise message unless callable.arity == arity
+        raise ::ArgumentError, message unless callable.arity == arity
       end
 
       def check_rc(rc, message)
