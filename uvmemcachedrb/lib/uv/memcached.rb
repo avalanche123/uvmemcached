@@ -1,4 +1,5 @@
 require 'ffi'
+require 'uvrb'
 
 module UV
   module Memcached
@@ -8,18 +9,20 @@ module UV
       Client.new(*args)
     end
 
+    extend FFI::Library
+
     begin
       LIB_PATHS = [
-        '/usr/local/lib', '/opt/local/lib', '/usr/lib64'
+        '/usr/local/lib', '/opt/local/lib', '/usr/lib', '/usr/lib64'
       ].map{|path| "#{path}/libuvmemcached.#{FFI::Platform::LIBSUFFIX}"}
 
       libuvmemcached = ffi_lib(LIB_PATHS + %w{libuvmemcached}).first
     rescue LoadError
       warn <<-WARNING
-        Unable to load this gem. The libuv library (or DLL) could not be found.
+        Unable to load this gem. The libuvmemcached library (or DLL) could not be found.
         If this is a Windows platform, make sure libuvmemcached.#{FFI::Platform::LIBSUFFIX} is on the PATH.
-        For non-Windows platforms, make sure libuv is located in this search path:
-        #{LIB_PATHS.join(":").inspect}
+        For non-Windows platforms, make sure libuvmemcached is located in this search path:
+        #{LIB_PATHS.join(":")}
       WARNING
       exit 255
     end
