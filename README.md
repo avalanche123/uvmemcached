@@ -10,7 +10,7 @@ This repository contains:
 install Vagrant from vagrantup.com website.
 
 ```shell
-clone git@github.com:avalanche123/uvmemcached.git
+clone https://github.com/avalanche123/uvmemcached.git
 cd uvmemcached
 vagrant up
 vagrant ssh
@@ -34,8 +34,9 @@ sudo make install
 After you've executed commands in Installing libuvmemcached section:
 
 ```shell
-sudo gem install bundler
+sudo gem install bundler --no-ri --no-rdoc
 cd /usr/local/src/uvmemcachedrb
-bundle
-rake test
+bundle install
+bundle exec rspec
+bundle exec cucumber
 ```

@@ -7,6 +7,6 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", inline: <<-SHELL
 echo "Installing all necessary packages"
 sudo apt-get update
-sudo apt-get install -y libtool autoconf automake libuv-dev memcached
+sudo apt-get install -y libtool autoconf automake libuv-dev memcached git ruby-dev
   SHELL
 end
