@@ -19,9 +19,7 @@ int main(int argc, char *argv[])
     uv_memcached_conn_pool_test(loop, verbose);
     uv_memcached_test(loop, verbose);
 
-    printf("Running event loop\n");
     uv_run(loop, UV_RUN_DEFAULT);
-    printf("Destroying event loop\n");
 
     assert(loop);
     uv_loop_delete(loop);

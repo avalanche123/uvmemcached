@@ -11,6 +11,7 @@ libuvmemcached_la_SOURCES = \
     memcached.c \
     pool.c
 
+CFLAGS = --pedantic -Wall -std=gnu99 -O2
 AM_CFLAGS = -g
 AM_CPPFLAGS = -I$(top_srcdir)/include
 bin_PROGRAMS = uvmemcached_selftest

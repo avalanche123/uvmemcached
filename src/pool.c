@@ -66,7 +66,6 @@ uv_memcached_conn_pool_destroy(uv_memcached_conn_pool_t** self_p)
 
     if (*self_p) {
         uv_memcached_conn_pool_t *self = *self_p;
-        printf("Destroying connection pool %p\n", self);
 
         for (i = 0; i < self->size; i++) {
             free(self->connections[i]->data);
@@ -78,7 +77,6 @@ uv_memcached_conn_pool_destroy(uv_memcached_conn_pool_t** self_p)
         free(self);
 
         *self_p = NULL;
-        printf("Destroyed connection pool\n");
     }
 }
 
@@ -86,46 +84,50 @@ int
 uv_memcached_conn_pool_connect(uv_memcached_conn_pool_t* self, const char* connection, void* context, uv_memcached_conn_pool_connect_cb callback)
 {
     int i, port;
-    char *str, *proto, *ip;
+    char *str;
+    char *proto;
+    char *ip;
+    int result = -1;
+    struct sockaddr_in addr;
+    uv_connect_t* req;
 
-    str   = strdup(connection);
-    proto = strtok(str, "://");
-    ip    = strtok(NULL, "://");
+    do {
+        str   = strdup(connection);
+        proto = strdup(strtok(str, "://"));
 
-    sscanf(strtok(NULL, ":"), "%d", &port);
-    free(str);
+        if (strcmp("tcp", proto) != 0) {
+            free(str);
+            free(proto);
 
-    printf("protocol=%s ip=%s port=%d\n", proto, ip, port);
+            break;
+        }
 
-    if (strcmp("tcp", proto) != 0) {
-        return -1;
-    }
+        ip = strdup(strtok(NULL, "://"));
+        sscanf(strtok(NULL, ":"), "%d", &port);
 
-    self->on_connect_ctx = context;
-    self->on_connect_cb  = callback;
+        free(str);
 
-    printf("Pool pointer is %p\n", self);
+        self->on_connect_ctx = context;
+        self->on_connect_cb  = callback;
 
-    struct sockaddr_in addr = uv_ip4_addr(ip, port);
+        addr = uv_ip4_addr(ip, port);
 
-    printf("Connect address initialized\n");
+        free(proto);
+        free(ip);
 
-    for (i = 0; i < self->size; i++) {
-        printf("In connection %d\n", i);
-        uv_connect_t* req = (uv_connect_t*) calloc(1, sizeof(uv_connect_t));
+        for (i = 0; i < self->size; i++) {
+            req = (uv_connect_t*) calloc(1, sizeof(uv_connect_t));
+            assert(req);
 
-        assert(req);
+            req->data = self;
 
-        req->data = self;
+            uv_tcp_connect(req, self->connections[i], addr, uv_memcached_conn_pool_on_connect);
+        }
 
-        printf("Current connection %d is %p\n", i, self->connections[i]);
+        result = 0;
+    } while (0);
 
-        assert(self->connections[i]);
-
-        uv_tcp_connect(req, self->connections[i], addr, uv_memcached_conn_pool_on_connect);
-    }
-
-    return 0;
+    return result;
 }
 
 int
@@ -149,8 +151,6 @@ uv_memcached_conn_pool_reserve_connection(uv_memcached_conn_pool_t* self, void* 
     uv_tcp_t* tcp;
     unsigned int next;
 
-    printf("in uv_memcached_conn_pool_reserve_connection, %d available\n", self->available);
-
     if (self->connected == 0) {
         return -1;
     }
@@ -167,8 +167,6 @@ uv_memcached_conn_pool_reserve_connection(uv_memcached_conn_pool_t* self, void* 
 
         self->head = next;
         self->available--;
-
-        printf("calling the reserve connection callback\n");
 
         callback((uv_memcached_conn_t*) tcp->data, context);
 
@@ -245,7 +243,6 @@ uv_memcached_reserve_connection_callback_queue_destroy(uv_memcached_reserve_conn
 
     if (*self_p) {
         uv_memcached_reserve_connection_callback_queue_t *self = *self_p;
-        printf("Destroying callback queue pool %p\n", self);
 
         for (i = 0; i < self->count; i++) {
             free(self->callbacks[i]);
@@ -255,7 +252,6 @@ uv_memcached_reserve_connection_callback_queue_destroy(uv_memcached_reserve_conn
         free(self);
 
         *self_p = NULL;
-        printf("Destroyed callback queue pool\n");
     }
 }
 
@@ -352,21 +348,13 @@ uv_memcached_conn_pool_on_close(uv_handle_t* handle)
     uv_memcached_conn_t* connection;
     uv_memcached_conn_pool_t* pool;
 
-    printf("handling connection close\n");
-
     tcp        = (uv_tcp_t*) handle;
-    printf("getting connection\n");
     connection = (uv_memcached_conn_t*) tcp->data;
-    printf("getting pool\n");
     pool       = connection->pool;
 
-    printf("decrementing connected\n");
     pool->connected--;
 
     if (pool->connected == 0) {
-        printf("running on disconnect\n");
-        assert(pool->on_disconnect_cb);
-        assert(pool->on_disconnect_ctx);
         pool->on_disconnect_cb(pool, pool->on_disconnect_ctx);
     }
 }
@@ -380,6 +368,7 @@ static void on_connect(uv_memcached_conn_pool_t* pool, int status, void* context
 static void on_reserve_connection(uv_memcached_conn_t* connection, void* context);
 static void on_write(uv_write_t* req, int status);
 static void on_read(uv_stream_t* stream, ssize_t nread, uv_buf_t buf);
+static void on_disconnect(uv_memcached_conn_pool_t* pool, void* context);
 static uv_buf_t on_alloc(uv_handle_t* handle, size_t suggested_size);
 
 void
@@ -398,7 +387,6 @@ on_connect(uv_memcached_conn_pool_t* pool, int status, void* context)
     assert(strcmp((char *) context, ctx) == 0);
 
     if (status != 0) {
-        printf("Connection failed\n");
         assert(0);
     }
 
@@ -411,22 +399,26 @@ on_reserve_connection(uv_memcached_conn_t* connection, void* context)
 {
     assert(connection);
 
-    char txt[250];
-
-    char* key   = strdup("mykey");
-    char* value = strdup("my value");
-
     uv_write_t* req;
-    sprintf(txt, "set %s 0 0 %lu\r\n%s\r\n", key, strlen(value), value);
+    char* text;
+    uv_buf_t* msg;
 
-    uv_buf_t msg = uv_buf_init(txt, sizeof(txt));
+    text  = (char*) calloc(250, sizeof(char));
+
+    sprintf(text, "set %s 0 0 %zu\r\n%s\r\n", "mykey", strlen("my value"), "my value");
+
+    msg = (uv_buf_t*) calloc(1, sizeof(uv_buf_t));
     req = (uv_write_t*) calloc(1, sizeof(uv_write_t));
 
+    assert(msg);
     assert(req);
 
-    req->data = connection->pool;
+    msg[0].base = text;
+    msg[0].len  = strlen(text);
 
-    uv_write(req, (uv_stream_t*) connection->tcp, &msg, 1, on_write);
+    req->data = msg;
+
+    uv_write(req, (uv_stream_t*) connection->tcp, msg, 1, on_write);
 }
 
 static void
@@ -435,10 +427,16 @@ on_write(uv_write_t* req, int status)
     assert(req);
     assert(status == 0);
 
-    // int i;
+    uv_buf_t* msg = (uv_buf_t*) req->data;
+
+    free(msg[0].base);
+    free(msg);
+
     uv_tcp_t* connection;
 
     connection = (uv_tcp_t*) req->handle;
+
+    free(req);
 
     uv_read_start((uv_stream_t*) connection, on_alloc, on_read);
 }
@@ -455,9 +453,16 @@ on_read(uv_stream_t* stream, ssize_t nread, uv_buf_t buf)
 {
     uv_tcp_t* tcp = (uv_tcp_t*) stream;
     uv_memcached_conn_t* connection = (uv_memcached_conn_t*) tcp->data;
-    printf("Read bytes %zd with %s\n", nread, buf.base);
     uv_read_stop(stream);
-    uv_memcached_conn_pool_destroy(&connection->pool);
+    assert(uv_memcached_conn_pool_release_connection(connection) == 0);
+    assert(uv_memcached_conn_pool_disconnect(connection->pool, NULL, on_disconnect) == 0);
+    free(buf.base);
+}
+
+static void
+on_disconnect(uv_memcached_conn_pool_t* pool, void* context)
+{
+    uv_memcached_conn_pool_destroy(&pool);
 }
 
 /* END TESTS */
