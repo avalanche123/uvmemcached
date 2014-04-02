@@ -4,10 +4,11 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder ".", "/usr/local/src/libuvmemcached"
 
   config.vm.provision "shell", inline: <<-SHELL
-sudo apt-get update
 echo "Installing all necessary packages"
-sudo apt-get install libtool autoconf automake libuv-dev memcached
+sudo apt-get update
+sudo apt-get install -y libtool autoconf automake libuv-dev memcached
 echo "Compiling libuvmemcached"
+cd /usr/local/src/libuvmemcached
 ./autogen.sh
 ./configure
 make check
