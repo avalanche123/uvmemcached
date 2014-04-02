@@ -34,6 +34,7 @@ sudo make install
 After you've executed commands in Installing libuvmemcached section:
 
 ```shell
+sudo service memcached stop
 sudo gem install bundler --no-ri --no-rdoc
 cd /usr/local/src/uvmemcachedrb
 bundle install
