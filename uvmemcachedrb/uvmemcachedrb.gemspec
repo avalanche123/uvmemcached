@@ -20,6 +20,17 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency 'aruba',    '= 0.5.4'
   gem.add_development_dependency 'rake',     '= 10.2.2'
 
-  gem.files         = `git ls-files`.split("\n")
-  gem.test_files    = `git ls-files -- {test,spec,features}/*`.split("\n")
+  gem.files = [
+    'lib/uv/memcached.rb',
+    'lib/uv/memcached/client.rb',
+    'uvmemcachedrb.gemspec'
+  ]
+  gem.test_files = [
+    'features/connection.feature',
+    'features/get_and_set.feature',
+    'features/support/env.rb',
+    'features/support/step_definitions/steps.rb',
+    'spec/spec_helper.rb',
+    'spec/uv/memcached/client_spec.rb'
+  ]
 end

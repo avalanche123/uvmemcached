@@ -1,7 +1,7 @@
 Given(/^memcached service is( not)? running$/) do |stop|
   if stop
-    `launchctl unload ~/Library/LaunchAgents/homebrew.mxcl.memcached.plist`
+    stop_memcached
   else
-    `launchctl load ~/Library/LaunchAgents/homebrew.mxcl.memcached.plist`
+    start_memcached
   end
 end
