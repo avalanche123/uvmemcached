@@ -1,5 +1,8 @@
 #ifndef UV_MEMCACHED_POOL_H
 #define UV_MEMCACHED_POOL_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef struct uv_memcached_conn_s uv_memcached_conn_t;
 
@@ -52,4 +55,7 @@ int uv_memcached_conn_pool_release_connection(uv_memcached_conn_t* self);
 
 void uv_memcached_conn_pool_test(uv_loop_t* loop, char verbose);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* UV_MEMCACHED_POOL_H */

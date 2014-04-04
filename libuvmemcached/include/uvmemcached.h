@@ -1,5 +1,8 @@
 #ifndef UV_MEMCACHED_H
 #define UV_MEMCACHED_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <stdlib.h>
 #include <assert.h>
@@ -33,4 +36,8 @@ int uv_memcached_set(uv_memcached_t* self, const char* key, char* data, void* co
 int uv_memcached_get(uv_memcached_t* self, const char* key, void* context, uv_memcached_get_cb callback);
 
 void uv_memcached_test(uv_loop_t* loop, char verbose);
+
+#ifdef __cplusplus
+}
+#endif
 #endif /* UV_MEMCACHED_H */
