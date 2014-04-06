@@ -26,6 +26,7 @@ AC_SUBST(LTVER)
 AC_CONFIG_SRCDIR([src/memcached.c])
 
 AC_PROG_CC
+AC_PROG_CC_STDC
 AC_PROG_LIBTOOL
 
 # Allow libuv to be installed in a custom path:
