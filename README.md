@@ -10,7 +10,7 @@ This repository contains:
 install Vagrant from vagrantup.com website.
 
 ```shell
-clone https://github.com/avalanche123/uvmemcached.git
+git clone https://github.com/avalanche123/uvmemcached.git
 cd uvmemcached
 vagrant up
 vagrant ssh
